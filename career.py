@@ -30,17 +30,17 @@ class Player:
             'matches': 0,
             'goals': 0,
             'assists': 0,
-            'salary': 0,  # Начальная зарплата 0
+            'salary': 0,
             'club': 'Свободный агент',
             'reputation': 1,
             'energy': 100,
-            'club_tier': 0  # 0-без клуба, 1-слабый, 2-средний, 3-сильный, 4-топ, 5-супертоп
+            'club_tier': 0
         }
         
         # Контракт
         self.contract = {
             'start_date': QDate(2024, 1, 1),
-            'end_date': QDate(2024, 1, 1),  # Пустой контракт
+            'end_date': QDate(2024, 1, 1),
             'duration_months': 0,
             'weekly_salary': 0,
             'club': 'Свободный агент',
@@ -53,17 +53,17 @@ class Player:
         }
         
         # История карьеры
-        self.career_history = []  # Каждая запись: {'club': , 'start': QDate, 'end': QDate, 'matches': 0, 'goals': 0, 'assists': 0}
+        self.career_history = []
         
         # Трофеи и достижения
-        self.trophies = []
+        self.trophies = []  # Каждая запись: {'name': , 'club': , 'date': , 'season': }
         self.injured = False
         self.injury_weeks = 0
         
-        # Дата рождения (для поздравлений)
+        # Дата рождения
         self.birth_day = 7
-        self.birth_month = 12  # 7 декабря
-        self.last_birthday_year = 2024  # Год последнего дня рождения
+        self.birth_month = 12
+        self.last_birthday_year = 2024
         
         # Флаги для юбилейных сообщений
         self.milestones = {
@@ -77,9 +77,28 @@ class Club:
     def __init__(self, name, country, tier, league, reputation):
         self.name = name
         self.country = country
-        self.tier = tier  # 0-5 (чем выше, тем сильнее клуб)
+        self.tier = tier
         self.league = league
         self.reputation = reputation
+        
+        # Турнирная таблица
+        self.league_position = 1
+        self.league_points = 0
+        self.league_matches = 0
+        self.league_wins = 0
+        self.league_draws = 0
+        self.league_losses = 0
+        self.league_goals_for = 0
+        self.league_goals_against = 0
+        
+        # Статистика в еврокубках
+        self.champions_league = False
+        self.europa_league = False
+        self.conference_league = False
+        self.europe_progress = 0  # 0-не участвует, 1-группа, 2-1/16, 3-1/8, 4-1/4, 5-1/2, 6-финал, 7-победитель
+        
+        # Статистика в кубке
+        self.cup_progress = 0  # 0-вылет, 1-1/64, 2-1/32, 3-1/16, 4-1/8, 5-1/4, 6-1/2, 7-финал, 8-победитель
 
 class TransferOffer:
     """Класс для предложения о трансфере"""
@@ -140,6 +159,187 @@ class CareerHistoryDialog(QDialog):
             self.history_table.setItem(i, 5, QTableWidgetItem(str(entry['goals'])))
             self.history_table.setItem(i, 6, QTableWidgetItem(str(entry['assists'])))
 
+class TrophiesDialog(QDialog):
+    """Диалог с трофеями"""
+    def __init__(self, player, parent=None):
+        super().__init__(parent)
+        self.player = player
+        self.setWindowTitle("Трофеи и достижения")
+        self.setMinimumSize(500, 400)
+        self.setStyleSheet(parent.styleSheet() if parent else "")
+        self.initUI()
+    
+    def initUI(self):
+        layout = QVBoxLayout()
+        
+        title = QLabel("🏆 ТРОФЕИ И ДОСТИЖЕНИЯ")
+        title.setStyleSheet("font-size: 16px; color: #FFD700; font-weight: bold;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+        
+        if not self.player.trophies:
+            no_trophies = QLabel("Пока нет выигранных трофеев")
+            no_trophies.setStyleSheet("color: #FFFFFF; font-size: 14px; padding: 20px;")
+            no_trophies.setAlignment(Qt.AlignCenter)
+            layout.addWidget(no_trophies)
+        else:
+            # Таблица с трофеями
+            trophies_table = QTableWidget()
+            trophies_table.setColumnCount(4)
+            trophies_table.setHorizontalHeaderLabels(["Трофей", "Клуб", "Дата", "Сезон"])
+            trophies_table.horizontalHeader().setStretchLastSection(True)
+            
+            trophies_table.setRowCount(len(self.player.trophies))
+            
+            for i, trophy in enumerate(self.player.trophies):
+                trophies_table.setItem(i, 0, QTableWidgetItem(trophy['name']))
+                trophies_table.setItem(i, 1, QTableWidgetItem(trophy['club']))
+                trophies_table.setItem(i, 2, QTableWidgetItem(trophy['date'].toString("dd.MM.yyyy")))
+                trophies_table.setItem(i, 3, QTableWidgetItem(trophy['season']))
+            
+            layout.addWidget(trophies_table)
+        
+        # Статистика трофеев
+        stats_group = QGroupBox("Статистика трофеев")
+        stats_layout = QVBoxLayout()
+        
+        # Подсчет трофеев по типам
+        league_titles = sum(1 for t in self.player.trophies if "Чемпион" in t['name'] and "Лиги" in t['name'])
+        cup_titles = sum(1 for t in self.player.trophies if "Кубок" in t['name'])
+        champions_league = sum(1 for t in self.player.trophies if "Лига Чемпионов" in t['name'])
+        europa_league = sum(1 for t in self.player.trophies if "Лига Европы" in t['name'])
+        conference_league = sum(1 for t in self.player.trophies if "Лига Конференций" in t['name'])
+        
+        stats_layout.addWidget(QLabel(f"🏆 Чемпионства в лиге: {league_titles}"))
+        stats_layout.addWidget(QLabel(f"🏆 Кубковые победы: {cup_titles}"))
+        stats_layout.addWidget(QLabel(f"🌟 Победы в Лиге Чемпионов: {champions_league}"))
+        stats_layout.addWidget(QLabel(f"🌟 Победы в Лиге Европы: {europa_league}"))
+        stats_layout.addWidget(QLabel(f"🌟 Победы в Лиге Конференций: {conference_league}"))
+        stats_layout.addWidget(QLabel(f"📊 Всего трофеев: {len(self.player.trophies)}"))
+        
+        stats_group.setLayout(stats_layout)
+        layout.addWidget(stats_group)
+        
+        # Кнопка закрытия
+        close_btn = QPushButton("Закрыть")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+        
+        self.setLayout(layout)
+
+class ClubInfoDialog(QDialog):
+    """Диалог с информацией о клубе"""
+    def __init__(self, club, player, parent=None):
+        super().__init__(parent)
+        self.club = club
+        self.player = player
+        self.setWindowTitle(f"Информация о клубе {club.name}")
+        self.setMinimumSize(500, 400)
+        self.setStyleSheet(parent.styleSheet() if parent else "")
+        self.initUI()
+    
+    def initUI(self):
+        layout = QVBoxLayout()
+        
+        # Заголовок
+        title = QLabel(f"🏢 {self.club.name}")
+        title.setStyleSheet("font-size: 18px; color: #FFD700; font-weight: bold;")
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+        
+        # Основная информация
+        info_group = QGroupBox("Основная информация")
+        info_layout = QGridLayout()
+        
+        info_layout.addWidget(QLabel(f"🌍 Страна:"), 0, 0)
+        info_layout.addWidget(QLabel(f"{self.club.country}"), 0, 1)
+        
+        info_layout.addWidget(QLabel(f"📊 Лига:"), 1, 0)
+        info_layout.addWidget(QLabel(f"{self.club.league}"), 1, 1)
+        
+        info_layout.addWidget(QLabel(f"📈 Уровень клуба:"), 2, 0)
+        tier_names = {0: "Любительский", 1: "Низший дивизион", 2: "Первая лига", 
+                     3: "Высшая лига", 4: "Топ-клуб", 5: "Суперклуб"}
+        info_layout.addWidget(QLabel(f"{tier_names.get(self.club.tier, 'Неизвестно')}"), 2, 1)
+        
+        info_layout.addWidget(QLabel(f"⭐ Репутация:"), 3, 0)
+        info_layout.addWidget(QLabel(f"{self.club.reputation}/100"), 3, 1)
+        
+        info_group.setLayout(info_layout)
+        layout.addWidget(info_group)
+        
+        # Турнирная таблица
+        league_group = QGroupBox("Турнирная таблица")
+        league_layout = QGridLayout()
+        
+        league_layout.addWidget(QLabel(f"🏆 Позиция в лиге:"), 0, 0)
+        league_layout.addWidget(QLabel(f"{self.club.league_position}-е место"), 0, 1)
+        
+        league_layout.addWidget(QLabel(f"⚽ Очки:"), 1, 0)
+        league_layout.addWidget(QLabel(f"{self.club.league_points}"), 1, 1)
+        
+        league_layout.addWidget(QLabel(f"📊 Матчи:"), 2, 0)
+        league_layout.addWidget(QLabel(f"{self.club.league_matches}"), 2, 1)
+        
+        league_layout.addWidget(QLabel(f"✅ Победы:"), 3, 0)
+        league_layout.addWidget(QLabel(f"{self.club.league_wins}"), 3, 1)
+        
+        league_layout.addWidget(QLabel(f"🤝 Ничьи:"), 4, 0)
+        league_layout.addWidget(QLabel(f"{self.club.league_draws}"), 4, 1)
+        
+        league_layout.addWidget(QLabel(f"❌ Поражения:"), 5, 0)
+        league_layout.addWidget(QLabel(f"{self.club.league_losses}"), 5, 1)
+        
+        league_layout.addWidget(QLabel(f"⚽ Голы:"), 6, 0)
+        league_layout.addWidget(QLabel(f"{self.club.league_goals_for}:{self.club.league_goals_against}"), 6, 1)
+        
+        league_group.setLayout(league_layout)
+        layout.addWidget(league_group)
+        
+        # Еврокубки
+        europe_group = QGroupBox("Еврокубки")
+        europe_layout = QVBoxLayout()
+        
+        europe_status = []
+        if self.club.champions_league:
+            europe_status.append("Лига Чемпионов")
+        if self.club.europa_league:
+            europe_status.append("Лига Европы")
+        if self.club.conference_league:
+            europe_status.append("Лига Конференций")
+        
+        if europe_status:
+            europe_layout.addWidget(QLabel("Участвует в: " + ", ".join(europe_status)))
+            
+            europe_progress_names = {0: "Не участвует", 1: "Групповой этап", 2: "1/16 финала", 
+                                    3: "1/8 финала", 4: "1/4 финала", 5: "1/2 финала", 
+                                    6: "Финалист", 7: "Победитель"}
+            europe_layout.addWidget(QLabel(f"Прогресс: {europe_progress_names.get(self.club.europe_progress, 'Неизвестно')}"))
+        else:
+            europe_layout.addWidget(QLabel("Не участвует в еврокубках"))
+        
+        europe_group.setLayout(europe_layout)
+        layout.addWidget(europe_group)
+        
+        # Национальный кубок
+        cup_group = QGroupBox("Национальный кубок")
+        cup_layout = QVBoxLayout()
+        
+        cup_progress_names = {0: "Вылет", 1: "1/64 финала", 2: "1/32 финала", 3: "1/16 финала",
+                             4: "1/8 финала", 5: "1/4 финала", 6: "1/2 финала", 
+                             7: "Финалист", 8: "Победитель"}
+        cup_layout.addWidget(QLabel(f"Прогресс: {cup_progress_names.get(self.club.cup_progress, 'Неизвестно')}"))
+        
+        cup_group.setLayout(cup_layout)
+        layout.addWidget(cup_group)
+        
+        # Кнопка закрытия
+        close_btn = QPushButton("Закрыть")
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(close_btn)
+        
+        self.setLayout(layout)
+
 class NegotiationDialog(QDialog):
     """Диалог переговоров с клубом"""
     def __init__(self, club, initial_salary, initial_bonuses, player, parent=None):
@@ -150,7 +350,7 @@ class NegotiationDialog(QDialog):
         self.player = player
         self.final_salary = initial_salary
         self.final_bonuses = initial_bonuses.copy()
-        self.final_duration = 12  # По умолчанию 1 год
+        self.final_duration = 12
         self.negotiation_success = False
         
         self.setWindowTitle(f"Переговоры с {club.name}")
@@ -209,13 +409,13 @@ class NegotiationDialog(QDialog):
         layout.addWidget(salary_group)
         
         # Бонусы
-        bonuses_group = QGroupBox("🎯 Бонусы")
+        bonuses_group = QGroupBox("🎯 Бонусы (от 2% до 10% от зарплаты)")
         bonuses_layout = QGridLayout()
         
         # За гол
         bonuses_layout.addWidget(QLabel("⚽ За гол:"), 0, 0)
         goal_bonus_spin = QSpinBox()
-        goal_bonus_spin.setRange(0, int(self.initial_bonuses['goal_bonus'] * 2))
+        goal_bonus_spin.setRange(int(self.initial_salary * 0.02), int(self.initial_salary * 0.1))
         goal_bonus_spin.setValue(self.initial_bonuses['goal_bonus'])
         goal_bonus_spin.setSuffix(" $")
         goal_bonus_spin.setSingleStep(50)
@@ -224,7 +424,7 @@ class NegotiationDialog(QDialog):
         # За передачу
         bonuses_layout.addWidget(QLabel("🎯 За передачу:"), 1, 0)
         assist_bonus_spin = QSpinBox()
-        assist_bonus_spin.setRange(0, int(self.initial_bonuses['assist_bonus'] * 2))
+        assist_bonus_spin.setRange(int(self.initial_salary * 0.02), int(self.initial_salary * 0.1))
         assist_bonus_spin.setValue(self.initial_bonuses['assist_bonus'])
         assist_bonus_spin.setSuffix(" $")
         assist_bonus_spin.setSingleStep(50)
@@ -233,7 +433,7 @@ class NegotiationDialog(QDialog):
         # За матч
         bonuses_layout.addWidget(QLabel("📊 За матч:"), 2, 0)
         match_bonus_spin = QSpinBox()
-        match_bonus_spin.setRange(0, int(self.initial_bonuses['match_bonus'] * 2))
+        match_bonus_spin.setRange(int(self.initial_salary * 0.02), int(self.initial_salary * 0.1))
         match_bonus_spin.setValue(self.initial_bonuses['match_bonus'])
         match_bonus_spin.setSuffix(" $")
         match_bonus_spin.setSingleStep(25)
@@ -242,7 +442,7 @@ class NegotiationDialog(QDialog):
         # За сухой матч
         bonuses_layout.addWidget(QLabel("🧤 За сухой матч:"), 3, 0)
         clean_sheet_spin = QSpinBox()
-        clean_sheet_spin.setRange(0, int(self.initial_bonuses['clean_sheet_bonus'] * 2))
+        clean_sheet_spin.setRange(int(self.initial_salary * 0.02), int(self.initial_salary * 0.1))
         clean_sheet_spin.setValue(self.initial_bonuses['clean_sheet_bonus'])
         clean_sheet_spin.setSuffix(" $")
         clean_sheet_spin.setSingleStep(50)
@@ -284,20 +484,16 @@ class NegotiationDialog(QDialog):
         
         # Функция обновления шанса
         def update_success_chance():
-            # Базовый шанс зависит от рейтинга и репутации игрока
             base_chance = 0.5 + (self.player.overall / 200) + (self.player.career_stats['reputation'] / 200)
             base_chance = min(0.9, base_chance)
             
-            # Расчет отклонений от начального предложения
             salary_ratio = salary_value.value() / self.initial_salary
             
-            # Если мы просим меньше - шанс растет, если больше - падает
             if salary_ratio <= 1.0:
-                salary_factor = 1.0 + (1.0 - salary_ratio) * 0.5  # Бонус за согласие на меньшую зарплату
+                salary_factor = 1.0 + (1.0 - salary_ratio) * 0.5
             else:
-                salary_factor = 1.0 - (salary_ratio - 1.0) * 0.8  # Штраф за завышенные требования
+                salary_factor = 1.0 - (salary_ratio - 1.0) * 0.8
             
-            # Анализ бонусов
             bonus_diff = 0
             bonus_count = 0
             
@@ -327,16 +523,14 @@ class NegotiationDialog(QDialog):
             
             bonus_factor = 1.0 + (bonus_diff / max(1, bonus_count))
             
-            # Фактор длительности контракта
             duration_value = contract_options[duration_combo.currentIndex()][1]
-            if duration_value >= 36:  # Длинный контракт (3+ года)
-                duration_factor = 0.95  # Клубы осторожнее с долгими контрактами
-            elif duration_value <= 12:  # Короткий контракт
-                duration_factor = 1.05  # Клубы охотнее дают короткие контракты
+            if duration_value >= 36:
+                duration_factor = 0.95
+            elif duration_value <= 12:
+                duration_factor = 1.05
             else:
                 duration_factor = 1.0
             
-            # Итоговый шанс
             chance = base_chance * salary_factor * bonus_factor * duration_factor
             chance = max(0.1, min(0.95, chance))
             
@@ -375,8 +569,6 @@ class NegotiationDialog(QDialog):
         self.setLayout(layout)
     
     def finish_negotiation(self, salary, goal_bonus, assist_bonus, match_bonus, clean_sheet_bonus, duration):
-        """Завершение переговоров"""
-        # Проверяем успех переговоров
         if random.random() < self.negotiation_chance:
             self.final_salary = salary
             self.final_bonuses = {
@@ -400,6 +592,8 @@ class FootballCareerSimulator(QMainWindow):
         self.weeks_passed = 0
         self.transfer_offers = []
         self.clubs = []
+        self.current_season = "2024"
+        self.season_start_date = QDate(2024, 8, 1)  # Начало сезона 1 августа
         self.init_clubs()
         self.initUI()
         
@@ -783,26 +977,168 @@ class FootballCareerSimulator(QMainWindow):
         self.clubs.extend(north_america)
         self.clubs.extend(asia)
         self.clubs.extend(africa)
+        
+        # Инициализируем турнирные таблицы
+        self.init_league_tables()
     
-    def generate_bonuses(self, club_tier):
-        """Генерация бонусов для контракта"""
+    def init_league_tables(self):
+        """Инициализация турнирных таблиц"""
+        for club in self.clubs:
+            # Случайная позиция в лиге
+            clubs_in_league = len([c for c in self.clubs if c.league == club.league])
+            club.league_position = random.randint(1, clubs_in_league)
+            club.league_matches = random.randint(10, 30)
+            club.league_wins = random.randint(3, club.league_matches - 3)
+            club.league_draws = random.randint(1, 8)
+            club.league_losses = club.league_matches - club.league_wins - club.league_draws
+            club.league_points = club.league_wins * 3 + club.league_draws
+            club.league_goals_for = random.randint(20, 60)
+            club.league_goals_against = random.randint(15, 50)
+            
+            # Еврокубки для топ-клубов
+            if club.tier >= 4 and random.random() < 0.7:
+                club.champions_league = True
+                club.europe_progress = random.randint(1, 6)
+            elif club.tier >= 3 and random.random() < 0.5:
+                club.europa_league = True
+                club.europe_progress = random.randint(1, 6)
+            elif club.tier >= 2 and random.random() < 0.3:
+                club.conference_league = True
+                club.europe_progress = random.randint(1, 6)
+            
+            # Кубок
+            club.cup_progress = random.randint(0, 8)
+    
+    def update_league_tables(self):
+        """Обновление турнирных таблиц (каждую неделю)"""
+        if not self.player or not self.player.has_contract:
+            return
+        
+        # Находим клуб игрока
+        player_club = None
+        for club in self.clubs:
+            if club.name == self.player.career_stats['club']:
+                player_club = club
+                break
+        
+        if not player_club:
+            return
+        
+        # Обновляем результаты в зависимости от последнего матча
+        # Это будет вызываться после каждого матча
+        
+        # Случайное движение в таблице
+        if random.random() < 0.3:
+            change = random.randint(-2, 2)
+            player_club.league_position = max(1, min(20, player_club.league_position + change))
+    
+    def update_european_competitions(self):
+        """Обновление еврокубков (раз в месяц)"""
+        if not self.player or not self.player.has_contract:
+            return
+        
+        # Находим клуб игрока
+        player_club = None
+        for club in self.clubs:
+            if club.name == self.player.career_stats['club']:
+                player_club = club
+                break
+        
+        if not player_club:
+            return
+        
+        # Прогресс в еврокубках
+        if (player_club.champions_league or player_club.europa_league or player_club.conference_league) and player_club.europe_progress > 0:
+            if player_club.europe_progress < 7 and random.random() < 0.2:  # 20% шанс на прогресс
+                player_club.europe_progress += 1
+                if player_club.europe_progress == 7:
+                    self.win_trophy("Лига Чемпионов" if player_club.champions_league else 
+                                   "Лига Европы" if player_club.europa_league else "Лига Конференций")
+    
+    def update_cup_competition(self):
+        """Обновление кубка (раз в месяц)"""
+        if not self.player or not self.player.has_contract:
+            return
+        
+        # Находим клуб игрока
+        player_club = None
+        for club in self.clubs:
+            if club.name == self.player.career_stats['club']:
+                player_club = club
+                break
+        
+        if not player_club:
+            return
+        
+        # Прогресс в кубке
+        if player_club.cup_progress > 0 and player_club.cup_progress < 8 and random.random() < 0.25:  # 25% шанс на прогресс
+            player_club.cup_progress += 1
+            if player_club.cup_progress == 8:
+                self.win_trophy(f"Кубок {player_club.country}")
+    
+    def win_trophy(self, trophy_name):
+        """Добавление трофея в коллекцию"""
+        if not self.player:
+            return
+        
+        season = self.get_current_season()
+        trophy = {
+            'name': trophy_name,
+            'club': self.player.career_stats['club'],
+            'date': self.current_date,
+            'season': season
+        }
+        self.player.trophies.append(trophy)
+        self.add_event(f"🏆 ВЫ ВЫИГРАЛИ {trophy_name}! Поздравляем с трофеем!")
+        
+        # Бонус за трофей
+        bonus = 5000 * (self.player.career_stats['club_tier'] + 1)
+        self.player.money += bonus
+        self.add_event(f"💰 Премия за победу: +${bonus}")
+    
+    def get_current_season(self):
+        """Получение текущего сезона"""
+        year = self.current_date.year()
+        if self.current_date >= QDate(year, 8, 1):
+            return f"{year}-{year+1}"
+        else:
+            return f"{year-1}-{year}"
+    
+    def apply_age_penalty(self):
+        """Применение штрафа к рейтингу за возраст"""
+        if not self.player or self.player.age < 33:
+            return
+        
+        penalties = {
+            33: 1,
+            34: 2,
+            35: 3,
+            36: 4,
+            37: 5,
+            38: 6,
+            39: 7
+        }
+        
+        penalty = penalties.get(self.player.age, 0)
+        if penalty > 0:
+            # Уменьшаем все характеристики
+            old_overall = self.player.overall
+            for stat in self.player.stats:
+                self.player.stats[stat] = max(1, self.player.stats[stat] - penalty)
+            self.update_overall()
+            self.add_event(f"📉 Возрастной спад: рейтинг упал на {penalty} (был {old_overall}, стал {self.player.overall})")
+    
+    def generate_bonuses(self, club_tier, salary):
+        """Генерация бонусов для контракта (от 2% до 10% от зарплаты)"""
         bonuses = {}
         
-        # Базовые значения в зависимости от уровня клуба
-        tier_multipliers = {0: 1, 1: 2, 2: 5, 3: 10, 4: 20, 5: 50}
-        multiplier = tier_multipliers.get(club_tier, 1)
+        min_bonus = int(salary * 0.02)
+        max_bonus = int(salary * 0.1)
         
-        # Бонус за гол
-        bonuses['goal_bonus'] = random.randint(50, 200) * multiplier
-        
-        # Бонус за передачу
-        bonuses['assist_bonus'] = random.randint(30, 150) * multiplier
-        
-        # Бонус за матч
-        bonuses['match_bonus'] = random.randint(10, 50) * multiplier
-        
-        # Бонус за сухой матч (для вратарей и защитников)
-        bonuses['clean_sheet_bonus'] = random.randint(100, 300) * multiplier
+        bonuses['goal_bonus'] = random.randint(min_bonus, max_bonus)
+        bonuses['assist_bonus'] = random.randint(min_bonus, max_bonus)
+        bonuses['match_bonus'] = random.randint(min_bonus, max_bonus)
+        bonuses['clean_sheet_bonus'] = random.randint(min_bonus, max_bonus)
         
         return bonuses
     
@@ -813,11 +1149,9 @@ class FootballCareerSimulator(QMainWindow):
         
         # Если у игрока уже есть контракт, завершаем его
         if self.player.has_contract and self.player.career_stats['club'] != "Свободный агент":
-            # Завершаем запись о предыдущем клубе в истории
             for entry in self.player.career_history:
                 if entry['club'] == self.player.career_stats['club'] and entry['end'].isNull():
                     entry['end'] = self.current_date
-                    # Обновляем статистику за период
                     entry['matches'] = self.player.career_stats['matches'] - entry.get('start_matches', 0)
                     entry['goals'] = self.player.career_stats['goals'] - entry.get('start_goals', 0)
                     entry['assists'] = self.player.career_stats['assists'] - entry.get('start_assists', 0)
@@ -827,7 +1161,7 @@ class FootballCareerSimulator(QMainWindow):
             'club': club.name,
             'country': club.country,
             'start': self.current_date,
-            'end': QDate(),  # Пустая дата, пока игрок в клубе
+            'end': QDate(),
             'start_matches': self.player.career_stats['matches'],
             'start_goals': self.player.career_stats['goals'],
             'start_assists': self.player.career_stats['assists'],
@@ -840,26 +1174,22 @@ class FootballCareerSimulator(QMainWindow):
         old_club = self.player.career_stats['club']
         old_tier = self.player.career_stats['club_tier']
         
-        # Обновляем информацию о клубе
         self.player.career_stats['club'] = club.name
         self.player.career_stats['club_tier'] = club.tier
         self.player.career_stats['salary'] = salary
         self.player.has_contract = True
         
-        # Обновляем контракт
         self.player.contract['start_date'] = self.current_date
         self.player.contract['end_date'] = self.current_date.addMonths(duration_months)
         self.player.contract['duration_months'] = duration_months
         self.player.contract['weekly_salary'] = salary
         self.player.contract['club'] = club.name
         
-        # Устанавливаем бонусы
         if bonuses:
             self.player.contract['bonuses'] = bonuses
         else:
-            self.player.contract['bonuses'] = self.generate_bonuses(club.tier)
+            self.player.contract['bonuses'] = self.generate_bonuses(club.tier, salary)
         
-        # Добавляем событие
         tier_names = {0: "Любительский", 1: "Низший дивизион", 2: "Первая лига", 
                      3: "Высшая лига", 4: "Топ-клуб", 5: "Суперклуб"}
         
@@ -870,27 +1200,22 @@ class FootballCareerSimulator(QMainWindow):
         self.add_event(contract_text)
         self.add_event(f"💰 Зарплата: ${salary}/неделя | Срок: {duration_months} месяцев")
         
-        # Информация о бонусах
         bonuses_text = f"🎯 Бонусы: ${self.player.contract['bonuses']['goal_bonus']}/гол, ${self.player.contract['bonuses']['assist_bonus']}/пас, ${self.player.contract['bonuses']['match_bonus']}/матч"
         self.add_event(bonuses_text)
         
-        # Очищаем предложения
         self.transfer_offers = []
         
         return True
     
     def process_weekly_expenses(self):
-        """Еженедельные расходы (всегда, независимо от контракта, но с 18 лет)"""
+        """Еженедельные расходы"""
         if not self.player:
             return
         
-        # До 18 лет никаких расходов
         if self.player.age < 18:
             return
         
-        # Базовая стоимость жизни зависит от страны (или базовый уровень для свободных агентов)
         if self.player.has_contract and self.player.career_stats['club'] != "Свободный агент":
-            # Если есть контракт, расходы зависят от страны клуба
             current_club = None
             for club in self.clubs:
                 if club.name == self.player.career_stats['club']:
@@ -898,62 +1223,31 @@ class FootballCareerSimulator(QMainWindow):
                     break
             
             country_costs = {
-                "Швейцария": 200,
-                "Норвегия": 188,
-                "Дания": 175,
-                "Исландия": 175,
-                "Великобритания": 150,
-                "Англия": 150,
-                "Франция": 138,
-                "Германия": 138,
-                "Нидерланды": 138,
-                "Бельгия": 125,
-                "Австрия": 125,
-                "Ирландия": 125,
-                "Финляндия": 125,
-                "Швеция": 125,
-                "Италия": 113,
-                "Испания": 113,
-                "США": 150,
-                "Канада": 138,
-                "Япония": 125,
-                "Южная Корея": 100,
-                "Китай": 88,
-                "Россия": 75,
-                "Украина": 63,
-                "Беларусь": 38,
-                "Казахстан": 38,
-                "Азербайджан": 38,
-                "Грузия": 38,
-                "Армения": 30,
-                "Турция": 75,
-                "Саудовская Аравия": 100,
-                "ОАЭ": 113,
-                "Катар": 113,
-                "Бразилия": 75,
-                "Аргентина": 63,
-                "Мексика": 75,
-                "Египет": 38,
-                "Марокко": 38,
-                "ЮАР": 50,
+                "Швейцария": 200, "Норвегия": 188, "Дания": 175, "Исландия": 175,
+                "Великобритания": 150, "Англия": 150, "Франция": 138, "Германия": 138,
+                "Нидерланды": 138, "Бельгия": 125, "Австрия": 125, "Ирландия": 125,
+                "Финляндия": 125, "Швеция": 125, "Италия": 113, "Испания": 113,
+                "США": 150, "Канада": 138, "Япония": 125, "Южная Корея": 100,
+                "Китай": 88, "Россия": 75, "Украина": 63, "Беларусь": 38,
+                "Казахстан": 38, "Азербайджан": 38, "Грузия": 38, "Армения": 30,
+                "Турция": 75, "Саудовская Аравия": 100, "ОАЭ": 113, "Катар": 113,
+                "Бразилия": 75, "Аргентина": 63, "Мексика": 75, "Египет": 38,
+                "Марокко": 38, "ЮАР": 50,
             }
             
             base_cost = 50
             if current_club and current_club.country in country_costs:
                 base_cost = country_costs[current_club.country]
             
-            # Дополнительные расходы в зависимости от уровня клуба
             if self.player.career_stats['club_tier'] >= 4:
                 base_cost += 50
             elif self.player.career_stats['club_tier'] >= 2:
                 base_cost += 25
         else:
-            # Для свободных агентов - базовые расходы (дешевле, чем с контрактом)
-            base_cost = 30  # Минимальные расходы на жизнь
+            base_cost = 30
         
         expenses = base_cost
         
-        # Случайные непредвиденные расходы (10% шанс)
         if random.random() < 0.1:
             unexpected_expenses = [
                 ("💊 Лечение зубов", random.randint(125, 500)),
@@ -972,21 +1266,17 @@ class FootballCareerSimulator(QMainWindow):
             expenses += expense_amount
             self.add_event(f"💰 Непредвиденные расходы: {expense_name} -${expense_amount}")
         
-        # Снимаем деньги
         self.player.money -= expenses
         
-        # Проверяем банкротство
         if self.player.money <= 0:
             self.add_event(f"💔 БАНКРОТСТВО! Деньги закончились (-${abs(self.player.money)})")
             self.game_over()
             return
         
-        # Добавляем запись о расходах
         status = " (свободный агент)" if not self.player.has_contract else ""
         self.add_event(f"💸 Еженедельные расходы{status}: -${expenses} (${self.player.money} осталось)")
     
     def receive_salary(self):
-        """Получение зарплаты (только при наличии контракта)"""
         if not self.player or not self.player.has_contract:
             return
         
@@ -995,7 +1285,6 @@ class FootballCareerSimulator(QMainWindow):
         self.add_event(f"💰 Получена зарплата: +${salary}")
     
     def pay_bonus(self, bonus_type, amount):
-        """Выплата бонуса (только при наличии контракта)"""
         if not self.player or not self.player.has_contract:
             return
         
@@ -1011,7 +1300,6 @@ class FootballCareerSimulator(QMainWindow):
             self.add_event(f"💰 Бонус {bonus_names.get(bonus_type, '')}: +${bonus}")
     
     def check_retirement(self):
-        """Проверка завершения карьеры по возрасту"""
         if not self.player:
             return False
         
@@ -1041,7 +1329,6 @@ class FootballCareerSimulator(QMainWindow):
         return False
     
     def game_over(self):
-        """Конец игры при банкротстве"""
         reply = QMessageBox.question(self, "💔 ИГРА ОКОНЧЕНА", 
                                     f"Вы обанкротились! Денег больше нет.\n\n"
                                     f"Статистика карьеры:\n"
@@ -1062,15 +1349,35 @@ class FootballCareerSimulator(QMainWindow):
             self.close()
     
     def show_career_history(self):
-        """Показать историю карьеры"""
         if not self.check_player():
             return
         
         dialog = CareerHistoryDialog(self.player, self)
         dialog.exec_()
     
+    def show_trophies(self):
+        if not self.check_player():
+            return
+        
+        dialog = TrophiesDialog(self.player, self)
+        dialog.exec_()
+    
+    def show_club_info(self):
+        if not self.check_player() or not self.player.has_contract:
+            QMessageBox.warning(self, "Внимание", "У вас нет контракта с клубом!")
+            return
+        
+        player_club = None
+        for club in self.clubs:
+            if club.name == self.player.career_stats['club']:
+                player_club = club
+                break
+        
+        if player_club:
+            dialog = ClubInfoDialog(player_club, self.player, self)
+            dialog.exec_()
+    
     def check_contract_expiry(self):
-        """Проверка истечения контракта"""
         if not self.player or not self.player.has_contract:
             return
         
@@ -1082,33 +1389,29 @@ class FootballCareerSimulator(QMainWindow):
             self.add_event("⚠️ Контракт истек! Вы стали свободным агентом")
     
     def check_birthday(self):
-        """Проверка дня рождения (каждый год после 7 декабря)"""
         if not self.player:
             return
         
         current_year = self.current_date.year()
         birthday_this_year = QDate(current_year, self.player.birth_month, self.player.birth_day)
         
-        # Если сегодняшняя дата больше или равна дню рождения в этом году
-        # И мы еще не отмечали день рождения в этом году
         if self.current_date >= birthday_this_year and self.player.last_birthday_year < current_year:
             self.player.age += 1
             self.player.last_birthday_year = current_year
             
-            # Подарок на день рождения (в любом возрасте)
             birthday_gift = random.randint(500, 2000)
             self.player.money += birthday_gift
             self.add_event(f"🎉🎂 С ДНЕМ РОЖДЕНИЯ! {self.player.name} исполнилось {self.player.age} лет! Получен подарок ${birthday_gift}! 🎂🎉")
             
-            # При достижении 18 лет особое сообщение
             if self.player.age == 18:
                 self.add_event("🎉 ТЕПЕРЬ ВЫ СОВЕРШЕННОЛЕТНИЙ! У вас появятся расходы")
             
-            # Проверка на завершение карьеры
+            # Применяем возрастной штраф
+            self.apply_age_penalty()
+            
             self.check_retirement()
     
     def check_milestones(self, stat_type, current_value):
-        """Проверка юбилейных достижений"""
         if not self.player:
             return
         
@@ -1151,49 +1454,39 @@ class FootballCareerSimulator(QMainWindow):
                     message = "⭐ " + message + " ⭐"
                 self.add_event(message)
                 
-                # Бонус за юбилей (только при наличии контракта)
                 if self.player.has_contract:
                     bonus = milestone * 50
                     self.player.money += bonus
                     self.add_event(f"💰 Премия за достижение: +${bonus}")
     
     def generate_transfer_offers(self):
-        """Генерация входящих предложений о трансфере"""
         if not self.player:
             return
         
-        # Игроки любого возраста могут получать предложения
-        # Шанс получить предложение (5% каждую неделю)
         if random.random() < 0.05:
             available_clubs = self.get_available_clubs()
             
             if available_clubs:
-                # Исключаем текущий клуб
                 if self.player.has_contract:
                     available_clubs = [c for c in available_clubs if c.name != self.player.career_stats['club']]
                 
                 if available_clubs:
-                    # Генерируем 1-2 предложения
                     num_offers = random.randint(1, 2)
                     for _ in range(min(num_offers, len(available_clubs))):
                         club = random.choice(available_clubs)
                         available_clubs.remove(club)
                         
-                        # Расчет зарплаты с большим разбросом
-                        base_salary = 100  # Минимальная зарплата
+                        base_salary = 100
                         tier_multipliers = {0: 1, 1: 5, 2: 20, 3: 50, 4: 200, 5: 500}
                         salary_multiplier = tier_multipliers.get(club.tier, 1)
                         
-                        # Зарплата от 100 до 200,000 в зависимости от уровня клуба и рейтинга игрока
                         salary = int(base_salary * salary_multiplier * (self.player.overall / 50) * random.uniform(0.7, 1.5))
                         salary = max(100, min(200000, salary))
                         
-                        # Длительность контракта
                         contract_options = [6, 12, 18, 24, 30, 36, 42, 48, 54, 60]
                         contract_months = random.choice(contract_options)
                         
-                        # Генерация бонусов
-                        bonuses = self.generate_bonuses(club.tier)
+                        bonuses = self.generate_bonuses(club.tier, salary)
                         
                         offer = TransferOffer(club, salary, contract_months, bonuses)
                         self.transfer_offers.append(offer)
@@ -1201,7 +1494,6 @@ class FootballCareerSimulator(QMainWindow):
                         self.add_event(f"📨 Поступило предложение от {club.name}! Зарплата: ${salary}/неделя, контракт: {contract_months} мес.")
     
     def show_transfer_offers(self):
-        """Показать диалог с предложениями о трансфере"""
         if not self.player:
             return
         
@@ -1221,6 +1513,12 @@ class FootballCareerSimulator(QMainWindow):
         title.setStyleSheet("font-size: 14px; color: #FFD700; font-weight: bold;")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
+        
+        # Кнопка "Отказать всем"
+        reject_all_btn = QPushButton("❌ Отказать всем")
+        reject_all_btn.clicked.connect(lambda: self.decline_all_offers(dialog))
+        reject_all_btn.setStyleSheet("background-color: #8B0000; color: white;")
+        layout.addWidget(reject_all_btn)
         
         # Список предложений
         offers_list = QListWidget()
@@ -1252,12 +1550,11 @@ class FootballCareerSimulator(QMainWindow):
                                f"   📊 Матч: ${offer.bonuses['match_bonus']}\n"
                                f"   🧤 Сухой матч: ${offer.bonuses['clean_sheet_bonus']}")
             info_label.setWordWrap(True)
-            info_label.setStyleSheet("font-size: 11px; color: #000000;")
+            info_label.setStyleSheet("font-size: 11px; color: #000000; background-color: #FFFFFF; padding: 5px; border-radius: 3px;")
             offer_layout.addWidget(info_label)
             
             buttons_row = QHBoxLayout()
             
-            # Кнопка переговоров
             negotiate_btn = QPushButton("🤝 Вести переговоры")
             negotiate_btn.clicked.connect(lambda checked, o=offer: self.negotiate_transfer(o, dialog))
             
@@ -1287,8 +1584,17 @@ class FootballCareerSimulator(QMainWindow):
         dialog.setLayout(layout)
         dialog.exec_()
     
+    def decline_all_offers(self, dialog):
+        """Отклонить все предложения"""
+        reply = QMessageBox.question(self, "Подтверждение", 
+                                    f"Вы уверены, что хотите отклонить все {len(self.transfer_offers)} предложений?",
+                                    QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.Yes:
+            self.add_event(f"❌ Отклонены все {len(self.transfer_offers)} предложений")
+            self.transfer_offers = []
+            dialog.accept()
+    
     def negotiate_transfer(self, offer, parent_dialog):
-        """Начать переговоры по трансферу"""
         negotiate_dialog = NegotiationDialog(
             offer.club, 
             offer.weekly_salary, 
@@ -1308,27 +1614,23 @@ class FootballCareerSimulator(QMainWindow):
             self.update_display()
     
     def accept_transfer_offer(self, offer, dialog):
-        """Принять предложение о трансфере без переговоров"""
         self.sign_contract(offer.club, offer.weekly_salary, offer.contract_months, offer.bonuses)
         dialog.accept()
         self.update_display()
     
     def decline_transfer_offer(self, index):
-        """Отклонить предложение о трансфере"""
         if 0 <= index < len(self.transfer_offers):
             club_name = self.transfer_offers[index].club.name
             del self.transfer_offers[index]
             self.add_event(f"❌ Отклонено предложение от {club_name}")
     
     def get_available_clubs(self):
-        """Получение списка доступных клубов на основе рейтинга игрока"""
         if not self.player:
             return []
         
         overall = self.player.overall
         reputation = self.player.career_stats['reputation']
         
-        # Определяем максимальный доступный tier
         if overall >= 90 and reputation >= 90:
             max_tier = 5
             min_tier = 3
@@ -1351,7 +1653,6 @@ class FootballCareerSimulator(QMainWindow):
             max_tier = 1
             min_tier = 0
         
-        # Фильтруем клубы
         available_clubs = []
         for club in self.clubs:
             if min_tier <= club.tier <= max_tier:
@@ -1362,16 +1663,13 @@ class FootballCareerSimulator(QMainWindow):
         return available_clubs
     
     def transfer(self):
-        """Попытка перейти в другой клуб (активный поиск)"""
         if not self.check_player():
             return
         
-        # Проверяем возраст - до 18 нельзя искать самому
         if self.player.age < 18:
             QMessageBox.warning(self, "Внимание", "Вы слишком молоды для самостоятельного поиска клуба! Достигните 18 лет.\n\nНо вы можете получать предложения от клубов.")
             return
         
-        # Проверяем, не истек ли контракт
         if self.player.has_contract and self.current_date < self.player.contract['end_date']:
             weeks_left = self.player.contract['end_date'].daysTo(self.current_date) // 7
             reply = QMessageBox.question(self, "Активный контракт", 
@@ -1383,10 +1681,9 @@ class FootballCareerSimulator(QMainWindow):
             if reply == QMessageBox.No:
                 return
             
-            # Штраф за нарушение контракта
             self.player.career_stats['reputation'] = max(0, self.player.career_stats['reputation'] - 20)
             self.player.career_stats['salary'] = int(self.player.career_stats['salary'] * 0.7)
-            fine = int(self.player.money * 0.1)  # Штраф 10% от текущего капитала
+            fine = int(self.player.money * 0.1)
             self.player.money -= fine
             self.add_event(f"⚠️ Нарушение контракта! Репутация снижена, штраф -${fine}")
         
@@ -1396,17 +1693,14 @@ class FootballCareerSimulator(QMainWindow):
         
         self.player.career_stats['energy'] -= 20
         
-        # Получаем доступные клубы
         available_clubs = self.get_available_clubs()
         
         if not available_clubs:
             QMessageBox.information(self, "Трансфер", "Нет доступных клубов для трансфера!")
             return
         
-        # Выбираем случайный клуб из доступных
         target_club = random.choice(available_clubs)
         
-        # Шанс на трансфер
         base_chance = (self.player.overall + self.player.career_stats['reputation']) / 200
         club_factor = max(0.3, 1 - (target_club.reputation - self.player.overall) / 50)
         transfer_chance = base_chance * club_factor
@@ -1429,14 +1723,12 @@ class FootballCareerSimulator(QMainWindow):
         self.update_display()
     
     def show_contract_offer(self, club):
-        """Показать предложение контракта от клуба"""
-        # Генерируем начальные бонусы
-        initial_bonuses = self.generate_bonuses(club.tier)
+        salary = self.calculate_salary(club)
+        initial_bonuses = self.generate_bonuses(club.tier, salary)
         
-        # Сразу открываем диалог переговоров
         negotiate_dialog = NegotiationDialog(
             club,
-            self.calculate_salary(club),
+            salary,
             initial_bonuses,
             self.player,
             self
@@ -1452,7 +1744,6 @@ class FootballCareerSimulator(QMainWindow):
             self.update_display()
     
     def calculate_salary(self, club):
-        """Расчет зарплаты для предложения"""
         base_salary = 100
         tier_multipliers = {0: 1, 1: 5, 2: 20, 3: 50, 4: 200, 5: 500}
         salary_multiplier = tier_multipliers.get(club.tier, 1)
@@ -1462,18 +1753,32 @@ class FootballCareerSimulator(QMainWindow):
         
         return salary
     
+    def get_position_multipliers(self, position):
+        """Получение множителей для голов и передач в зависимости от позиции"""
+        position_stats = {
+            'CF': {'goals': (0.8, 1.2), 'assists': (0.3, 0.6)},    # Нападающий - много голов
+            'ST': {'goals': (0.7, 1.1), 'assists': (0.3, 0.6)},
+            'LW': {'goals': (0.5, 0.9), 'assists': (0.4, 0.7)},    # Вингер - и голы, и передачи
+            'RW': {'goals': (0.5, 0.9), 'assists': (0.4, 0.7)},
+            'CAM': {'goals': (0.3, 0.7), 'assists': (0.6, 1.0)},    # Атакующий полузащитник - больше передач
+            'CM': {'goals': (0.2, 0.5), 'assists': (0.4, 0.8)},     # Центральный полузащитник
+            'CDM': {'goals': (0.1, 0.3), 'assists': (0.2, 0.5)},    # Опорник
+            'CB': {'goals': (0.05, 0.15), 'assists': (0.05, 0.15)}, # Защитник
+            'LB': {'goals': (0.05, 0.15), 'assists': (0.1, 0.3)},   # Крайний защитник
+            'RB': {'goals': (0.05, 0.15), 'assists': (0.1, 0.3)},
+            'GK': {'goals': (0, 0.01), 'assists': (0, 0.01)}        # Вратарь
+        }
+        return position_stats.get(position, {'goals': (0.2, 0.5), 'assists': (0.2, 0.5)})
+    
     def show_stats(self):
-        """Показать детальную статистику"""
         if not self.check_player():
             return
         
-        # Определяем текущий уровень клуба
         tier_names = {0: "Свободный агент", 1: "Любительский", 2: "Низший дивизион", 
                      3: "Первая лига", 4: "Высшая лига", 5: "Топ-клуб"}
         
         current_tier = tier_names.get(self.player.career_stats['club_tier'], "Неизвестно")
         
-        # Информация о контракте
         if self.player.has_contract:
             weeks_left = self.player.contract['end_date'].daysTo(self.current_date) // 7
             if weeks_left > 0:
@@ -1489,13 +1794,15 @@ class FootballCareerSimulator(QMainWindow):
             contract_status = "НЕТ КОНТРАКТА (свободный агент)"
             bonuses_info = "Нет бонусов (нет контракта)"
         
-        # Статистика по бонусам (заработанные)
         earned_bonuses = ""
         if self.player.has_contract and self.player.career_stats['matches'] > 0:
             earned_bonuses = (f"\n\nЗаработано бонусов:\n"
                              f"💰 За матчи: ${self.player.career_stats['matches'] * self.player.contract['bonuses']['match_bonus']}\n"
                              f"💰 За голы: ${self.player.career_stats['goals'] * self.player.contract['bonuses']['goal_bonus']}\n"
                              f"💰 За передачи: ${self.player.career_stats['assists'] * self.player.contract['bonuses']['assist_bonus']}")
+        
+        goals_per_match = self.player.career_stats['goals'] / max(1, self.player.career_stats['matches'])
+        assists_per_match = self.player.career_stats['assists'] / max(1, self.player.career_stats['matches'])
         
         stats_text = f"""
         Детальная статистика игрока {self.player.name}:
@@ -1521,8 +1828,8 @@ class FootballCareerSimulator(QMainWindow):
         
         Карьерная статистика:
         - Матчи: {self.player.career_stats['matches']}
-        - Голы: {self.player.career_stats['goals']}
-        - Передачи: {self.player.career_stats['assists']}
+        - Голы: {self.player.career_stats['goals']} (в среднем {goals_per_match:.2f} за матч)
+        - Передачи: {self.player.career_stats['assists']} (в среднем {assists_per_match:.2f} за матч)
         - Г+П за матч: {(self.player.career_stats['goals'] + self.player.career_stats['assists']) / max(1, self.player.career_stats['matches']):.2f}
         
         Юбилеи:
@@ -1540,7 +1847,6 @@ class FootballCareerSimulator(QMainWindow):
         QMessageBox.information(self, "Статистика карьеры", stats_text)
     
     def initUI(self):
-        """Инициализация пользовательского интерфейса"""
         self.setWindowTitle('Симулятор карьеры футболиста')
         self.setGeometry(100, 100, 1200, 700)
         self.setStyleSheet("""
@@ -1678,7 +1984,6 @@ class FootballCareerSimulator(QMainWindow):
         QTimer.singleShot(100, self.show_create_player_dialog)
     
     def create_left_panel(self):
-        """Создание левой панели с информацией об игроке"""
         left_panel = QGroupBox("ИНФОРМАЦИЯ ОБ ИГРОКЕ")
         left_layout = QVBoxLayout()
         
@@ -1709,7 +2014,6 @@ class FootballCareerSimulator(QMainWindow):
         self.player_contract_label = QLabel("Контракт: -")
         self.player_contract_label.setObjectName("value_label")
         
-        # Информация о бонусах
         self.bonuses_label = QLabel("Бонусы: нет контракта")
         self.bonuses_label.setObjectName("value_label")
         self.bonuses_label.setWordWrap(True)
@@ -1776,7 +2080,6 @@ class FootballCareerSimulator(QMainWindow):
         return left_panel
     
     def create_center_panel(self):
-        """Создание центральной панели с календарем и статистикой"""
         center_panel = QGroupBox("КАРЬЕРА И СОБЫТИЯ")
         center_layout = QVBoxLayout()
         
@@ -1835,7 +2138,6 @@ class FootballCareerSimulator(QMainWindow):
         return center_panel
     
     def create_right_panel(self):
-        """Создание правой панели с действиями"""
         right_panel = QGroupBox("ДЕЙСТВИЯ")
         right_layout = QVBoxLayout()
         
@@ -1847,6 +2149,8 @@ class FootballCareerSimulator(QMainWindow):
             ("📨 Предложения", self.show_transfer_offers, "Просмотр входящих предложений"),
             ("📊 Статистика", self.show_stats, "Детальная статистика"),
             ("📜 История карьеры", self.show_career_history, "История клубов"),
+            ("🏆 Трофеи", self.show_trophies, "Выигранные трофеи"),
+            ("🏢 Информация о клубе", self.show_club_info, "Турнирная таблица и еврокубки"),
             ("💾 Сохранить", self.save_game, "Сохранить прогресс"),
             ("📂 Загрузить", self.load_game, "Загрузить игру")
         ]
@@ -1878,7 +2182,6 @@ class FootballCareerSimulator(QMainWindow):
         return right_panel
     
     def show_create_player_dialog(self):
-        """Диалог создания игрока"""
         dialog = QDialog(self)
         dialog.setWindowTitle("Создание игрока")
         dialog.setStyleSheet(self.styleSheet())
@@ -1921,7 +2224,7 @@ class FootballCareerSimulator(QMainWindow):
         params_layout.addWidget(age_label, 0, 0)
         
         age_spin = QSpinBox()
-        age_spin.setRange(14, 39)  # Максимум 39, чтобы не сразу закончить игру
+        age_spin.setRange(14, 39)
         age_spin.setValue(14)
         age_spin.setSuffix(" лет")
         params_layout.addWidget(age_spin, 0, 1)
@@ -1949,7 +2252,8 @@ class FootballCareerSimulator(QMainWindow):
         params_group.setLayout(params_layout)
         layout.addWidget(params_group)
         
-        info_label = QLabel("ℹ️ До 18 лет нет расходов. Игра заканчивается в 40 лет.")
+        info_label = QLabel("ℹ️ До 18 лет нет расходов. Игра заканчивается в 40 лет.\n"
+                           "С 33 лет рейтинг начинает падать.")
         info_label.setStyleSheet("color: #FFD700; font-size: 11px; padding: 5px;")
         info_label.setWordWrap(True)
         info_label.setAlignment(Qt.AlignCenter)
@@ -1984,17 +2288,14 @@ class FootballCareerSimulator(QMainWindow):
             self.player.career_stats['salary'] = 0
             self.player.career_stats['club_tier'] = 0
             
-            # Балансировка начальных характеристик
             base_stats = overall_spin.value()
             for stat in self.player.stats:
                 self.player.stats[stat] = min(99, max(1, base_stats + random.randint(-5, 5)))
             
-            # Устанавливаем дату рождения
             self.player.birth_day = 7
             self.player.birth_month = 12
             self.player.last_birthday_year = self.current_date.year()
             
-            # Сбрасываем флаги юбилеев
             self.player.milestones = {
                 'matches': {1: False, 5: False, 10: False, 50: False, 100: False, 200: False, 300: False},
                 'goals': {1: False, 5: False, 10: False, 50: False, 100: False, 200: False, 300: False},
@@ -2020,7 +2321,6 @@ class FootballCareerSimulator(QMainWindow):
         dialog.exec_()
     
     def train(self):
-        """Тренировка игрока - улучшает одну характеристику"""
         if not self.check_player():
             return
         
@@ -2030,7 +2330,6 @@ class FootballCareerSimulator(QMainWindow):
         
         self.player.career_stats['energy'] -= 20
         
-        # Тренировка улучшает одну случайную характеристику на 1-2 очка
         stat = random.choice(list(self.player.stats.keys()))
         if self.player.stats[stat] < 100:
             improvement = random.randint(1, 2)
@@ -2044,11 +2343,9 @@ class FootballCareerSimulator(QMainWindow):
         self.update_display()
     
     def play_match(self):
-        """Сыграть матч"""
         if not self.check_player():
             return
         
-        # Проверяем, есть ли у игрока клуб
         if not self.player.has_contract or self.player.career_stats['club'] == "Свободный агент":
             QMessageBox.warning(self, "Внимание", "Вы не можете играть матчи без контракта! Сначала подпишите контракт с клубом.")
             return
@@ -2063,85 +2360,107 @@ class FootballCareerSimulator(QMainWindow):
         
         self.player.career_stats['energy'] -= 30
         
-        # Сохраняем предыдущие значения для проверки юбилеев
-        old_matches = self.player.career_stats['matches']
-        old_goals = self.player.career_stats['goals']
-        old_assists = self.player.career_stats['assists']
+        # Получаем множители для позиции
+        multipliers = self.get_position_multipliers(self.player.position)
         
-        # Результат матча зависит от рейтинга игрока и случайности
+        # Результат матча
         performance = random.randint(50, 100) + self.player.overall
         
+        # Генерация голов и передач с учетом позиции
         goals = 0
         assists = 0
         
-        # Диапазоны с меньшим средним количеством, но возможностью достичь 7
-        if performance > 160:  # Экстраординарная игра (очень редко)
-            goals = random.randint(4, 7)
-            assists = random.randint(2, 5)
+        if performance > 160:
+            goals = random.randint(int(4 * multipliers['goals'][0]), int(4 * multipliers['goals'][1]))
+            assists = random.randint(int(2 * multipliers['assists'][0]), int(2 * multipliers['assists'][1]))
             result = "ЛЕГЕНДАРНО! 👑🔥"
-        elif performance > 145:  # Феноменальная игра
-            goals = random.randint(2, 5)
-            assists = random.randint(1, 4)
+        elif performance > 145:
+            goals = random.randint(int(2 * multipliers['goals'][0]), int(3 * multipliers['goals'][1]))
+            assists = random.randint(int(1 * multipliers['assists'][0]), int(2 * multipliers['assists'][1]))
             result = "ФЕНОМЕНАЛЬНО! 🔥"
-        elif performance > 130:  # Отличная игра
-            goals = random.randint(1, 3)
-            assists = random.randint(0, 2)
+        elif performance > 130:
+            goals = random.randint(int(1 * multipliers['goals'][0]), int(2 * multipliers['goals'][1]))
+            assists = random.randint(0, int(2 * multipliers['assists'][1]))
             result = "ОТЛИЧНО ⭐"
-        elif performance > 115:  # Хорошая игра
-            goals = random.randint(0, 2)
-            assists = random.randint(0, 2)
+        elif performance > 115:
+            goals = random.randint(0, int(2 * multipliers['goals'][1]))
+            assists = random.randint(0, int(2 * multipliers['assists'][1]))
             result = "ХОРОШО 👍"
-        elif performance > 100:  # Средняя игра
-            goals = random.randint(0, 1)
-            assists = random.randint(0, 1)
+        elif performance > 100:
+            goals = random.randint(0, int(1 * multipliers['goals'][1]))
+            assists = random.randint(0, int(1 * multipliers['assists'][1]))
             result = "НОРМАЛЬНО 📊"
-        elif performance > 85:  # Ниже среднего
+        elif performance > 85:
             goals = 0
-            assists = random.randint(0, 1)
+            assists = random.randint(0, int(1 * multipliers['assists'][1]))
             result = "ТАК СЕБЕ 📉"
-        else:  # Плохая игра
+        else:
             goals = 0
             assists = 0
             result = "ПЛОХО 👎"
         
-        # Ограничиваем максимальные значения
-        goals = min(7, goals)
-        assists = min(7, assists)
+        goals = min(7, max(0, goals))
+        assists = min(7, max(0, assists))
         
-        # Обновляем статистику
+        # Генерация счета матча
+        team_goals = goals + random.randint(0, 3)
+        opponent_goals = random.randint(0, team_goals - 1) if team_goals > 0 else random.randint(0, 2)
+        match_score = f"{team_goals}:{opponent_goals}"
+        
         self.player.career_stats['matches'] += 1
         self.player.career_stats['goals'] += goals
         self.player.career_stats['assists'] += assists
         
-        # Выплата бонусов (только при наличии контракта)
+        # Обновление статистики клуба в лиге
+        player_club = None
+        for club in self.clubs:
+            if club.name == self.player.career_stats['club']:
+                player_club = club
+                break
+        
+        if player_club:
+            player_club.league_matches += 1
+            player_club.league_goals_for += team_goals
+            player_club.league_goals_against += opponent_goals
+            
+            if team_goals > opponent_goals:
+                player_club.league_wins += 1
+                player_club.league_points += 3
+            elif team_goals == opponent_goals:
+                player_club.league_draws += 1
+                player_club.league_points += 1
+            else:
+                player_club.league_losses += 1
+            
+            # Обновление позиции в лиге (упрощенно)
+            if team_goals > opponent_goals and random.random() < 0.3:
+                player_club.league_position = max(1, player_club.league_position - random.randint(1, 2))
+            elif team_goals < opponent_goals and random.random() < 0.2:
+                player_club.league_position = min(20, player_club.league_position + random.randint(1, 2))
+        
         self.pay_bonus('goal_bonus', goals)
         self.pay_bonus('assist_bonus', assists)
         self.pay_bonus('match_bonus', 1)
         
-        # Проверяем юбилеи
         self.check_milestones('matches', self.player.career_stats['matches'])
         self.check_milestones('goals', self.player.career_stats['goals'])
         self.check_milestones('assists', self.player.career_stats['assists'])
         
-        # Шанс травмы
         if random.random() < 0.05:
             self.player.injured = True
             self.player.injury_weeks = random.randint(1, 4)
             self.add_event(f"⚠️ Травма во время матча! Выбыл на {self.player.injury_weeks} недель")
         
-        # Обновляем репутацию
         rep_change = goals * 3 + assists * 2
         self.player.career_stats['reputation'] = min(100, self.player.career_stats['reputation'] + rep_change)
         
-        # Добавляем событие
-        event_text = f"⚽ Матч сыгран {result} Голы: {goals}, передачи: {assists}"
+        event_text = f"⚽ Матч сыгран {result} Счет: {match_score} | Ваш вклад: Голы: {goals}, передачи: {assists}"
         self.add_event(event_text)
         
         self.advance_time()
         self.update_display()
     
     def rest(self):
-        """Отдых для восстановления энергии"""
         if not self.check_player():
             return
         
@@ -2151,7 +2470,6 @@ class FootballCareerSimulator(QMainWindow):
                 self.player.injured = False
                 self.add_event("✨ Травма зажила! Игрок снова готов к матчам")
         
-        # Восстановление энергии от 30 до 40
         energy_recovery = random.randint(30, 40)
         self.player.career_stats['energy'] = min(100, self.player.career_stats['energy'] + energy_recovery)
         
@@ -2160,7 +2478,6 @@ class FootballCareerSimulator(QMainWindow):
         self.update_display()
     
     def save_game(self):
-        """Сохранение игры"""
         if not self.check_player():
             return
         
@@ -2168,38 +2485,35 @@ class FootballCareerSimulator(QMainWindow):
         self.add_event("💾 Прогресс сохранен")
     
     def load_game(self):
-        """Загрузка игры"""
         QMessageBox.information(self, "Загрузка", "📂 Функция загрузки в разработке")
     
     def update_overall(self):
-        """Обновление общего рейтинга на основе характеристик"""
         if self.player:
             self.player.overall = int(sum(self.player.stats.values()) / len(self.player.stats))
     
     def advance_time(self):
-        """Продвижение времени (на неделю)"""
         self.weeks_passed += 1
         self.current_date = self.current_date.addDays(7)
         
-        # Каждую неделю расходы (с 18 лет)
         self.process_weekly_expenses()
         
-        # Получаем зарплату (каждые 4 недели) - только при наличии контракта
         if self.weeks_passed % 4 == 0:
             self.receive_salary()
+            # Обновление еврокубков раз в месяц
+            self.update_european_competitions()
+            self.update_cup_competition()
         
-        # Проверяем день рождения (каждый год после 7 декабря)
         self.check_birthday()
-        
         self.check_contract_expiry()
         self.generate_transfer_offers()
         
-        # Проверка банкротства
+        # Обновление турнирной таблицы
+        self.update_league_tables()
+        
         if self.player and self.player.money <= 0:
             self.game_over()
     
     def update_display(self):
-        """Обновление отображения данных"""
         if not self.player:
             return
         
@@ -2212,7 +2526,6 @@ class FootballCareerSimulator(QMainWindow):
         self.player_salary_label.setText(f"💰 Зарплата: ${self.player.career_stats['salary'] if self.player.has_contract else 0}/неделя")
         self.player_reputation_label.setText(f"📊 Репутация: {self.player.career_stats['reputation']}/100")
         
-        # Отображение контракта
         if self.player.has_contract:
             weeks_left = self.player.contract['end_date'].daysTo(self.current_date) // 7
             if weeks_left > 0:
@@ -2220,7 +2533,6 @@ class FootballCareerSimulator(QMainWindow):
             else:
                 contract_text = f"📝 Контракт: ИСТЕК {self.player.contract['end_date'].toString('dd.MM.yy')}"
             
-            # Отображение бонусов
             bonuses_text = (f"🎯 Бонусы: ⚽${self.player.contract['bonuses']['goal_bonus']} "
                            f"🎯${self.player.contract['bonuses']['assist_bonus']} "
                            f"📊${self.player.contract['bonuses']['match_bonus']}")
@@ -2251,7 +2563,7 @@ class FootballCareerSimulator(QMainWindow):
         self.career_injury_label.setText(injury_text)
         
         self.date_label.setText(self.current_date.toString("d MMMM yyyy"))
-        self.week_counter_label.setText(f"📆 Неделя {self.weeks_passed}")
+        self.week_counter_label.setText(f"📆 Неделя {self.weeks_passed} | Сезон {self.get_current_season()}")
         
         if self.player.injured:
             self.status_label.setText(f"⚠️ ТРАВМА! Восстановление: {self.player.injury_weeks} недель")
@@ -2266,7 +2578,6 @@ class FootballCareerSimulator(QMainWindow):
         self.offers_label.setText(f"📨 Предложений: {len(self.transfer_offers)}")
     
     def add_event(self, event_text):
-        """Добавление события в список"""
         timestamp = self.current_date.toString("dd.MM.yyyy")
         self.events_list.insertItem(0, f"[{timestamp}] {event_text}")
         
@@ -2274,7 +2585,6 @@ class FootballCareerSimulator(QMainWindow):
             self.events_list.takeItem(self.events_list.count() - 1)
     
     def check_player(self):
-        """Проверка, создан ли игрок"""
         if not self.player:
             QMessageBox.warning(self, "Внимание", "Сначала создайте игрока!")
             self.show_create_player_dialog()
