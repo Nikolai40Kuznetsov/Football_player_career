@@ -1211,6 +1211,8 @@ class FootballCareerSimulator(QMainWindow):
             Club("Викингур", "Исландия", 2, "Премьер-лига", 44),
             Club("Люксембург", "Люксембург", 2, "Национальный дивизион", 40),
             Club("Дифферданж", "Люксембург", 2, "Национальный дивизион", 39),
+            Club("Дрита", "Косово", 2, "Суперлига Косово", 46),
+            Club("Приштина", "Косово", 2, "Суперлига Косово", 45),
         ]
         
         # Любительские клубы
@@ -1223,11 +1225,6 @@ class FootballCareerSimulator(QMainWindow):
             Club("Старт", "Россия", 0, "Любительская лига", 24, True),
             Club("Торпедо-Любители", "Россия", 0, "Любительская лига", 26, True),
             Club("Зенит-Любители", "Россия", 0, "Любительская лига", 27, True),
-        ]
-        
-        kosovo_clubs = [
-            Club("Дрита", "Косово", 2, "Суперлига Косово", 46),
-            Club("Приштина", "Косово", 2, "Суперлига Косово", 45),
         ]
         
         russian_clubs = [
@@ -1377,7 +1374,6 @@ class FootballCareerSimulator(QMainWindow):
         self.clubs.extend(medium_european_clubs)
         self.clubs.extend(weak_european_clubs)
         self.clubs.extend(amateur_clubs)
-        self.clubs.extend(kosovo_clubs)
         self.clubs.extend(russian_clubs)
         self.clubs.extend(south_america)
         self.clubs.extend(north_america)
@@ -1415,7 +1411,7 @@ class FootballCareerSimulator(QMainWindow):
     def check_trophy_day(self):
         """Проверка - 25 мая, день вручения трофеев"""
         if self.current_date.day() == 25 and self.current_date.month() == 5:
-            if self.player and self.player.has_contract and not self.player.contract['club'].is_amateur:
+            if self.player and self.player.has_contract:
                 player_club = None
                 for club in self.clubs:
                     if club.name == self.player.career_stats['club']:
@@ -1473,19 +1469,19 @@ class FootballCareerSimulator(QMainWindow):
         months_left = self.player.contract['end_date'].daysTo(self.current_date) // 30
         satisfaction = self.player.career_stats['club_satisfaction']
         
-        if satisfaction < 60:
+        if satisfaction < 75:
             return
         
         if months_left <= 0.25:
             if random.random() < 0.5:
                 self.offer_contract_extension()
-        elif months_left <= 6:
+        elif months_left >= 5 and months_left <= 6:
             if random.random() < 0.33:
                 self.offer_contract_extension()
-        elif months_left <= 12:
+        elif months_left >= 11 and months_left <= 12:
             if random.random() < 0.2:
                 self.offer_contract_extension()
-        elif months_left <= 24:
+        elif months_left >= 22 and months_left <= 24:
             if random.random() < 0.1:
                 self.offer_contract_extension()
     
